@@ -7,6 +7,15 @@ exports.getAllAdmin = (req, res) => {
   });
 };
 
+exports.loginAdmin = (req, res) => {
+  const { email, password } = req.body;
+  db.query('SELECT id, email FROM admin WHERE email = ? AND password = ?', [email, password], (err, results) => {
+    if (err) return res.status(500).json({ error: err });
+    if (results.length === 0) return res.status(401).json({ error: 'Login gagal' });
+    res.json({ id: results[0].id, email: results[0].email, role: 'admin' });
+  });
+};
+
 exports.createAdmin = (req, res) => {
   const { nama, email, password } = req.body;
   db.query('INSERT INTO admin (nama, email, password) VALUES (?, ?, ?)', [nama, email, password], (err, result) => {

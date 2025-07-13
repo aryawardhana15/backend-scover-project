@@ -17,6 +17,7 @@ const historyMateriRoutes = require('./routes/historyMateri');
 const silabusRoutes = require('./routes/silabus');
 const mataPelajaranRoutes = require('./routes/mataPelajaran');
 const notifikasiRoutes = require('./routes/notifikasi');
+const mentorMataPelajaranRoutes = require('./routes/mentorMataPelajaran');
 
 app.use('/api/kelas', kelasRoutes);
 app.use('/api/users', usersRoutes);
@@ -29,6 +30,7 @@ app.use('/api/history-materi', historyMateriRoutes);
 app.use('/api/silabus', silabusRoutes);
 app.use('/api/mata-pelajaran', mataPelajaranRoutes);
 app.use('/api/notifikasi', notifikasiRoutes);
+app.use('/api/mentor-mata-pelajaran', mentorMataPelajaranRoutes);
 
 app.listen(5000, () => {
   console.log('Server running on port 5000');

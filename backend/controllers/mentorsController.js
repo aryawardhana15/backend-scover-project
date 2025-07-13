@@ -13,4 +13,15 @@ exports.createMentor = (req, res) => {
     if (err) return res.status(500).json({ error: err });
     res.json({ id: result.insertId, nama, email });
   });
+};
+
+// Tambahkan endpoint login mentor
+exports.loginMentor = (req, res) => {
+  const { email, password } = req.body;
+  db.query('SELECT id, email FROM mentors WHERE email = ? AND password = ?', [email, password], (err, results) => {
+    if (err) return res.status(500).json({ error: err });
+    if (results.length === 0) return res.status(401).json({ error: 'Login gagal' });
+    // Kirim data mentor lengkap
+    res.json({ id: results[0].id, email: results[0].email, role: 'mentor' });
+  });
 }; 
