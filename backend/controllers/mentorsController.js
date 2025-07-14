@@ -57,6 +57,7 @@ exports.getAvailableMentors = (req, res) => {
   // 4. Tidak sedang mengajar kelas lain di waktu tsb
   const sql = `
     SELECT m.id, m.nama, m.email
+    SELECT DISTINCT m.id, m.nama, m.email
     FROM mentors m
     JOIN mentor_mata_pelajaran mmp ON m.id = mmp.mentor_id
     LEFT JOIN availability_mentor am ON m.id = am.mentor_id AND am.hari = ? AND am.sesi = ? AND am.is_available = 1
