@@ -32,6 +32,12 @@ app.use('/api/mata-pelajaran', mataPelajaranRoutes);
 app.use('/api/notifikasi', notifikasiRoutes);
 app.use('/api/mentor-mata-pelajaran', mentorMataPelajaranRoutes);
 
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('GLOBAL ERROR:', err);
+  res.status(500).json({ error: 'Internal server error', detail: err.message });
+});
+
 app.listen(5000, () => {
   console.log('Server running on port 5000');
 }); 

@@ -50,13 +50,13 @@ exports.getAvailableMentors = (req, res) => {
     return res.status(400).json({ error: 'mapel_id, tanggal, sesi wajib diisi' });
   }
   // Ambil hari dari tanggal
-  const hari = new Date(tanggal).toLocaleDateString('id-ID', { weekday: 'long' });
+  const hariArray = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  const hari = hariArray[new Date(tanggal).getDay()];
   // 1. Mentor harus bisa mapel tsb
   // 2. Mentor available di hari/sesi tsb
   // 3. Tidak ada jadwal tabrakan di jadwal_sesi pada tanggal & sesi tsb
   // 4. Tidak sedang mengajar kelas lain di waktu tsb
   const sql = `
-    SELECT m.id, m.nama, m.email
     SELECT DISTINCT m.id, m.nama, m.email
     FROM mentors m
     JOIN mentor_mata_pelajaran mmp ON m.id = mmp.mentor_id
