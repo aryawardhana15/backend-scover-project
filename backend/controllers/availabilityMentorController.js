@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { getHariFromDate } = require('../utils/dateUtils');
 
 // GET: Semua availability, bisa filter by mentor_id, minggu_ke
 exports.getAllAvailability = (req, res) => {
@@ -49,7 +50,7 @@ function checkConflicts(mentor_id, minggu_ke, data, callback) {
           const conflicts = [];
           for (const jadwal of allJadwal) {
             const tgl = new Date(jadwal.tanggal);
-            const hari = tgl.toLocaleDateString('id-ID', { weekday: 'long' });
+            const hari = getHariFromDate(tgl);
             const sesi = jadwal.sesi;
             if (hariSesiSet.has(`${hari}_${sesi}`)) {
               conflicts.push({ tanggal: jadwal.tanggal, sesi, kelas_id: jadwal.kelas_id, type: 'double_booking' });
@@ -58,7 +59,7 @@ function checkConflicts(mentor_id, minggu_ke, data, callback) {
           const kelasHari = {};
           for (const jadwal of allJadwal) {
             const tgl = new Date(jadwal.tanggal);
-            const hari = tgl.toLocaleDateString('id-ID', { weekday: 'long' });
+            const hari = getHariFromDate(tgl);
             const key = `${jadwal.kelas_id}_${hari}`;
             if (!kelasHari[key]) kelasHari[key] = 0;
             kelasHari[key]++;

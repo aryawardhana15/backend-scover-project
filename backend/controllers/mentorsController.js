@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { getWeekNumber, getHariFromDate } = require('../utils/dateUtils');
 
 exports.getAllMentors = (req, res) => {
   db.query('SELECT * FROM mentors', (err, results) => {
@@ -41,7 +42,7 @@ exports.getJadwalMentor = (req, res) => {
       res.json(results);
     }
   );
-}; 
+};
 
 // Endpoint: GET /mentors/available?mapel_id=...&tanggal=...&sesi=...&kelas_id=...
 exports.getAvailableMentors = (req, res) => {
@@ -49,18 +50,35 @@ exports.getAvailableMentors = (req, res) => {
   if (!mapel_id || !tanggal || !sesi) {
     return res.status(400).json({ error: 'mapel_id, tanggal, sesi wajib diisi' });
   }
-  // Ambil hari dari tanggal
-  const hariArray = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-  const hari = hariArray[new Date(tanggal).getDay()];
+  
+  // Ambil hari dari tanggal dengan perhitungan yang benar
+  const date = new Date(tanggal);
+  const hari = getHariFromDate(date);
+  
+  // Hitung minggu ke berapa dari tanggal
+  const mingguKe = getWeekNumber(date);
+  
+  // Debug log
+  console.log('DEBUG getAvailableMentors:');
+  console.log('Tanggal:', tanggal);
+  console.log('Hari:', hari);
+  console.log('Minggu ke:', mingguKe);
+  console.log('Sesi:', sesi);
+  console.log('Mapel ID:', mapel_id);
+  
   // 1. Mentor harus bisa mapel tsb
-  // 2. Mentor available di hari/sesi tsb
+  // 2. Mentor available di hari/sesi tsb pada minggu yang sesuai
   // 3. Tidak ada jadwal tabrakan di jadwal_sesi pada tanggal & sesi tsb
   // 4. Tidak sedang mengajar kelas lain di waktu tsb
   const sql = `
     SELECT DISTINCT m.id, m.nama, m.email
     FROM mentors m
     JOIN mentor_mata_pelajaran mmp ON m.id = mmp.mentor_id
-    LEFT JOIN availability_mentor am ON m.id = am.mentor_id AND am.hari = ? AND am.sesi = ? AND am.is_available = 1
+    LEFT JOIN availability_mentor am ON m.id = am.mentor_id 
+      AND am.hari = ? 
+      AND am.sesi = ? 
+      AND am.minggu_ke = ?
+      AND am.is_available = 1
     WHERE mmp.mata_pelajaran_id = ?
       AND am.id IS NOT NULL
       AND NOT EXISTS (
@@ -68,8 +86,15 @@ exports.getAvailableMentors = (req, res) => {
         WHERE js.mentor_id = m.id AND js.tanggal = ? AND js.sesi = ?
       )
   `;
-  db.query(sql, [hari, sesi, mapel_id, tanggal, sesi], (err, results) => {
-    if (err) return res.status(500).json({ error: err });
+  
+  console.log('SQL params:', [hari, sesi, mingguKe, mapel_id, tanggal, sesi]);
+  
+  db.query(sql, [hari, sesi, mingguKe, mapel_id, tanggal, sesi], (err, results) => {
+    if (err) {
+      console.error('DB ERROR:', err);
+      return res.status(500).json({ error: err });
+    }
+    console.log('Query results:', results);
     res.json(results);
   });
 }; 
