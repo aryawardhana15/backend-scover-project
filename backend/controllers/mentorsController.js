@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { getWeekNumber, getHariFromDate } = require('../utils/dateUtils');
+const { generateToken } = require('../auth');
 
 exports.getAllMentors = (req, res) => {
   db.query('SELECT * FROM mentors', (err, results) => {
@@ -22,8 +23,9 @@ exports.loginMentor = (req, res) => {
   db.query('SELECT id, email FROM mentors WHERE email = ? AND password = ?', [email, password], (err, results) => {
     if (err) return res.status(500).json({ error: err });
     if (results.length === 0) return res.status(401).json({ error: 'Login gagal' });
-    // Kirim data mentor lengkap
-    res.json({ id: results[0].id, email: results[0].email, role: 'mentor' });
+    const user = { id: results[0].id, email: results[0].email, role: 'mentor' };
+    const token = generateToken(user);
+    res.json({ ...user, token });
   });
 };
 

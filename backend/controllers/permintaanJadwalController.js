@@ -17,4 +17,12 @@ exports.createPermintaan = (req, res) => {
       res.json({ id: result.insertId, user_id, mentor_id, kelas_id, tanggal, sesi, status });
     }
   );
+};
+
+exports.getPermintaanByUser = (req, res) => {
+  const userId = req.params.user_id;
+  db.query('SELECT * FROM permintaan_jadwal WHERE user_id = ?', [userId], (err, results) => {
+    if (err) return res.status(500).json({ error: err });
+    res.json(results);
+  });
 }; 

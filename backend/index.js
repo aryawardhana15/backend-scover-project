@@ -18,6 +18,8 @@ const silabusRoutes = require('./routes/silabus');
 const mataPelajaranRoutes = require('./routes/mataPelajaran');
 const notifikasiRoutes = require('./routes/notifikasi');
 const mentorMataPelajaranRoutes = require('./routes/mentorMataPelajaran');
+const { errorHandler } = require('./middleware');
+const { authenticateJWT } = require('./auth');
 
 app.use('/api/kelas', kelasRoutes);
 app.use('/api/users', usersRoutes);
@@ -31,12 +33,7 @@ app.use('/api/silabus', silabusRoutes);
 app.use('/api/mata-pelajaran', mataPelajaranRoutes);
 app.use('/api/notifikasi', notifikasiRoutes);
 app.use('/api/mentor-mata-pelajaran', mentorMataPelajaranRoutes);
-
-// Global error handler
-app.use((err, req, res, next) => {
-  console.error('GLOBAL ERROR:', err);
-  res.status(500).json({ error: 'Internal server error', detail: err.message });
-});
+app.use(errorHandler);
 
 app.listen(5000, () => {
   console.log('Server running on port 5000');

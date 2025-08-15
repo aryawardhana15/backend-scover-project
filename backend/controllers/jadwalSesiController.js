@@ -53,6 +53,21 @@ exports.createJadwalSesi = (req, res) => {
   });
 };
 
+exports.getJadwalByUser = (req, res) => {
+  const userId = req.params.user_id;
+  // Ambil kelas_id user
+  const dbUser = require('../config/db');
+  dbUser.query('SELECT kelas_id FROM users WHERE id = ?', [userId], (err, userRows) => {
+    if (err) return res.status(500).json({ error: err });
+    if (userRows.length === 0) return res.status(404).json({ error: 'User tidak ditemukan' });
+    const kelasId = userRows[0].kelas_id;
+    db.query('SELECT * FROM jadwal_sesi WHERE kelas_id = ?', [kelasId], (err2, results) => {
+      if (err2) return res.status(500).json({ error: err2 });
+      res.json(results);
+    });
+  });
+};
+
 // Helper: Kirim notifikasi ke mentor
 function insertNotifikasiMentor(mentor_id, kelas_id, tanggal, sesi) {
   // Ambil nama kelas

@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { generateToken } = require('../auth');
 
 exports.getAllAdmin = (req, res) => {
   db.query('SELECT * FROM admin', (err, results) => {
@@ -12,7 +13,9 @@ exports.loginAdmin = (req, res) => {
   db.query('SELECT id, email FROM admin WHERE email = ? AND password = ?', [email, password], (err, results) => {
     if (err) return res.status(500).json({ error: err });
     if (results.length === 0) return res.status(401).json({ error: 'Login gagal' });
-    res.json({ id: results[0].id, email: results[0].email, role: 'admin' });
+    const user = { id: results[0].id, email: results[0].email, role: 'admin' };
+    const token = generateToken(user);
+    res.json({ ...user, token });
   });
 };
 
