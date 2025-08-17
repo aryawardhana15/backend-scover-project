@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { generateToken } = require('../auth');
+const { getWeekNumber } = require('../utils/dateUtils');
 
 exports.getAllAdmin = (req, res) => {
   db.query('SELECT * FROM admin', (err, results) => {
@@ -25,4 +26,23 @@ exports.createAdmin = (req, res) => {
     if (err) return res.status(500).json({ error: err });
     res.json({ id: result.insertId, nama, email });
   });
-}; 
+};
+
+exports.getCurrentWeek = (req, res) => {
+  const today = new Date();
+  const weekNumber = getWeekNumber(today);
+  res.json({ weekNumber });
+};
+
+exports.getStats = (req, res) => {
+  const query = `
+    SELECT
+      (SELECT COUNT(*) FROM users) AS total_user,
+      (SELECT COUNT(*) FROM mentors) AS total_mentor,
+      (SELECT COUNT(*) FROM kelas) AS total_kelas;
+  `;
+  db.query(query, (err, results) => {
+    if (err) return res.status(500).json({ error: err });
+    res.json(results[0]);
+  });
+};

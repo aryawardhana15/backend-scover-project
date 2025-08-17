@@ -2,14 +2,16 @@ const express = require('express');
 const router = express.Router();
 const mentorsController = require('../controllers/mentorsController');
 const { requireRole } = require('../middleware');
+const { authenticateJWT } = require('../auth');
 
-router.get('/', mentorsController.getAllMentors);
+// Public routes
 router.post('/', mentorsController.createMentor);
-// Tambahkan endpoint login mentor
 router.post('/login', mentorsController.loginMentor);
-// Endpoint untuk ambil jadwal mengajar mentor
-router.get('/:id/jadwal', mentorsController.getJadwalMentor);
-// Endpoint untuk ambil mentor yang available pada mapel, tanggal, sesi, kelas tertentu
-router.get('/available', mentorsController.getAvailableMentors);
 
-module.exports = router; 
+// Protected routes
+router.get('/', authenticateJWT, mentorsController.getAllMentors);
+router.get('/:id/jadwal', authenticateJWT, mentorsController.getJadwalMentor);
+router.get('/available', authenticateJWT, mentorsController.getAvailableMentors);
+router.get('/:id', authenticateJWT, mentorsController.getMentorById);
+
+module.exports = router;

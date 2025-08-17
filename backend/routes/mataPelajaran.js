@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const mataPelajaranController = require('../controllers/mataPelajaranController');
+const { authenticateJWT } = require('../auth');
 
-router.get('/', mataPelajaranController.getAllMataPelajaran);
-router.post('/', mataPelajaranController.createMataPelajaran);
+router.get('/', authenticateJWT, mataPelajaranController.getAllMataPelajaran);
+router.post('/', authenticateJWT, mataPelajaranController.createMataPelajaran);
 
-module.exports = router; 
+module.exports = router;

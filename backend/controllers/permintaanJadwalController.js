@@ -25,4 +25,20 @@ exports.getPermintaanByUser = (req, res) => {
     if (err) return res.status(500).json({ error: err });
     res.json(results);
   });
-}; 
+};
+
+exports.approvePermintaan = (req, res) => {
+  const { id } = req.params;
+  db.query('UPDATE permintaan_jadwal SET status = "approved" WHERE id = ?', [id], (err, result) => {
+    if (err) return res.status(500).json({ error: err });
+    res.json({ message: 'Permintaan jadwal disetujui' });
+  });
+};
+
+exports.rejectPermintaan = (req, res) => {
+  const { id } = req.params;
+  db.query('UPDATE permintaan_jadwal SET status = "rejected" WHERE id = ?', [id], (err, result) => {
+    if (err) return res.status(500).json({ error: err });
+    res.json({ message: 'Permintaan jadwal ditolak' });
+  });
+};

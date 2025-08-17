@@ -1,9 +1,11 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Import routes
 const kelasRoutes = require('./routes/kelas');
@@ -18,6 +20,8 @@ const silabusRoutes = require('./routes/silabus');
 const mataPelajaranRoutes = require('./routes/mataPelajaran');
 const notifikasiRoutes = require('./routes/notifikasi');
 const mentorMataPelajaranRoutes = require('./routes/mentorMataPelajaran');
+const chatRoutes = require('./routes/chat');
+const pengumumanRoutes = require('./routes/pengumuman');
 const { errorHandler } = require('./middleware');
 const { authenticateJWT } = require('./auth');
 
@@ -33,8 +37,10 @@ app.use('/api/silabus', silabusRoutes);
 app.use('/api/mata-pelajaran', mataPelajaranRoutes);
 app.use('/api/notifikasi', notifikasiRoutes);
 app.use('/api/mentor-mata-pelajaran', mentorMataPelajaranRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/pengumuman', pengumumanRoutes);
 app.use(errorHandler);
 
-app.listen(5000, () => {
-  console.log('Server running on port 5000');
-}); 
+app.listen(3001, () => {
+  console.log('Server running on port 3001');
+});

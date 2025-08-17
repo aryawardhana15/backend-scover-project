@@ -10,7 +10,22 @@ exports.getAllJadwalSesi = (req, res) => {
 
 exports.createJadwalSesi = (req, res) => {
   console.log('REQ BODY:', req.body);
-  const { kelas_id, mentor_id, tanggal, sesi, jam_mulai, jam_selesai, status, mata_pelajaran_id } = req.body;
+  const { kelas_id, mentor_id, tanggal, sesi, status, mata_pelajaran_id } = req.body;
+
+  const sesiTimes = {
+    1: { jam_mulai: '09:00', jam_selesai: '10:30' },
+    2: { jam_mulai: '10:45', jam_selesai: '12:15' },
+    3: { jam_mulai: '13:00', jam_selesai: '14:30' },
+    4: { jam_mulai: '16:00', jam_selesai: '17:30' },
+    5: { jam_mulai: '18:00', jam_selesai: '19:30' },
+  };
+
+  const { jam_mulai, jam_selesai } = sesiTimes[sesi] || { jam_mulai: null, jam_selesai: null };
+
+  if (!jam_mulai || !jam_selesai) {
+    return res.status(400).json({ error: 'Sesi tidak valid' });
+  }
+
   // 1. Cek kemampuan
   db.query('SELECT 1 FROM mentor_mata_pelajaran WHERE mentor_id = ? AND mata_pelajaran_id = ?', [mentor_id, mata_pelajaran_id], (err, rows) => {
     if (err) {
@@ -79,4 +94,4 @@ function insertNotifikasiMentor(mentor_id, kelas_id, tanggal, sesi) {
       // Tidak perlu handle error di sini, biar silent
     });
   });
-} 
+}

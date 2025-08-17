@@ -3,29 +3,38 @@ const { getWeekNumber, getHariFromDate } = require('../utils/dateUtils');
 const { generateToken } = require('../auth');
 
 exports.getAllMentors = (req, res) => {
-  db.query('SELECT * FROM mentors', (err, results) => {
+  db.query('SELECT id, nama, email, foto_profil FROM mentors', (err, results) => {
     if (err) return res.status(500).json({ error: err });
     res.json(results);
   });
 };
 
 exports.createMentor = (req, res) => {
-  const { nama, email, password } = req.body;
-  db.query('INSERT INTO mentors (nama, email, password) VALUES (?, ?, ?)', [nama, email, password], (err, result) => {
+  const { nama, email, password, foto_profil } = req.body;
+  db.query('INSERT INTO mentors (nama, email, password, foto_profil) VALUES (?, ?, ?, ?)', [nama, email, password, foto_profil], (err, result) => {
     if (err) return res.status(500).json({ error: err });
-    res.json({ id: result.insertId, nama, email });
+    res.json({ id: result.insertId, nama, email, foto_profil });
   });
 };
 
 // Tambahkan endpoint login mentor
 exports.loginMentor = (req, res) => {
   const { email, password } = req.body;
-  db.query('SELECT id, email FROM mentors WHERE email = ? AND password = ?', [email, password], (err, results) => {
+  db.query('SELECT id, email, nama FROM mentors WHERE email = ? AND password = ?', [email, password], (err, results) => {
     if (err) return res.status(500).json({ error: err });
     if (results.length === 0) return res.status(401).json({ error: 'Login gagal' });
-    const user = { id: results[0].id, email: results[0].email, role: 'mentor' };
+    const user = { id: results[0].id, email: results[0].email, nama: results[0].nama, role: 'mentor' };
     const token = generateToken(user);
     res.json({ ...user, token });
+  });
+};
+
+exports.getMentorById = (req, res) => {
+  const { id } = req.params;
+  db.query('SELECT id, nama, email, foto_profil FROM mentors WHERE id = ?', [id], (err, results) => {
+    if (err) return res.status(500).json({ error: err });
+    if (results.length === 0) return res.status(404).json({ error: 'Mentor not found' });
+    res.json(results[0]);
   });
 };
 
@@ -99,4 +108,4 @@ exports.getAvailableMentors = (req, res) => {
     console.log('Query results:', results);
     res.json(results);
   });
-}; 
+};

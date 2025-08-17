@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const notifikasiController = require('../controllers/notifikasiController');
+const { authenticateJWT } = require('../auth');
 
-router.get('/', notifikasiController.getAllNotifikasi);
-router.post('/', notifikasiController.createNotifikasi);
+router.get('/', authenticateJWT, notifikasiController.getAllNotifikasi);
+router.post('/', authenticateJWT, notifikasiController.createNotifikasi);
 
-module.exports = router; 
+module.exports = router;

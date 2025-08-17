@@ -11,7 +11,11 @@ function authenticateJWT(req, res, next) {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.split(' ')[1];
     jwt.verify(token, SECRET, (err, user) => {
-      if (err) return res.status(403).json({ error: 'Token tidak valid' });
+      if (err) {
+        console.error('JWT Verification Error:', err);
+        return res.status(403).json({ error: 'Token tidak valid' });
+      }
+      console.log('Decoded JWT User:', user);
       req.user = user;
       next();
     });

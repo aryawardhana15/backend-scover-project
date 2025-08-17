@@ -1,8 +1,16 @@
 // Role-based access control middleware
 function requireRole(role) {
   return function (req, res, next) {
+    console.log('Require Role Check:', {
+      requiredRole: role,
+      user: req.user,
+    });
     // Asumsi: req.user sudah diisi oleh proses autentikasi (misal JWT, session, dsb)
     if (!req.user || req.user.role !== role) {
+      console.error('Authorization Failed:', {
+        requiredRole: role,
+        userRole: req.user ? req.user.role : 'No user object',
+      });
       return res.status(403).json({ error: 'Akses ditolak: role tidak sesuai' });
     }
     next();
