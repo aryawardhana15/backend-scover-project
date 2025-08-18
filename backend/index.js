@@ -41,6 +41,6 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/pengumuman', pengumumanRoutes);
 app.use(errorHandler);
 
-app.listen(3001, () => {
-  console.log('Server running on port 3001');
+app.listen(3002, () => {
+  console.log('Server running on port 3002');
 });

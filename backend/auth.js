@@ -13,9 +13,9 @@ function authenticateJWT(req, res, next) {
     jwt.verify(token, SECRET, (err, user) => {
       if (err) {
         console.error('JWT Verification Error:', err);
-        return res.status(403).json({ error: 'Token tidak valid' });
+        return res.status(401).json({ error: 'Token tidak valid' });
       }
-      console.log('Decoded JWT User:', user);
+      // console.log('Decoded JWT User:', user); // Removed for production
       req.user = user;
       next();
     });

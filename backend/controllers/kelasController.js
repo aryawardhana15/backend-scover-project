@@ -2,7 +2,7 @@ const db = require('../config/db');
 
 exports.getAllKelas = (req, res) => {
   db.query('SELECT * FROM kelas', (err, results) => {
-    if (err) return res.status(500).json({ error: err });
+    if (err) return res.status(500).json({ error: err.message || 'Database error occurred' });
     res.json(results);
   });
 };
@@ -10,7 +10,7 @@ exports.getAllKelas = (req, res) => {
 exports.createKelas = (req, res) => {
   const { nama, tipe } = req.body;
   db.query('INSERT INTO kelas (nama, tipe) VALUES (?, ?)', [nama, tipe], (err, result) => {
-    if (err) return res.status(500).json({ error: err });
+    if (err) return res.status(500).json({ error: err.message || 'Database error occurred' });
     res.json({ id: result.insertId, nama, tipe });
   });
 }; 

@@ -10,7 +10,7 @@ exports.getByMentor = (req, res) => {
      WHERE mmp.mentor_id = ?`,
     [mentor_id],
     (err, results) => {
-      if (err) return res.status(500).json({ error: err });
+      if (err) return res.status(500).json({ error: err.message || 'Database error occurred' });
       res.json(results);
     }
   );
@@ -26,7 +26,7 @@ exports.getByMapel = (req, res) => {
      WHERE mmp.mata_pelajaran_id = ?`,
     [mapel_id],
     (err, results) => {
-      if (err) return res.status(500).json({ error: err });
+      if (err) return res.status(500).json({ error: err.message || 'Database error occurred' });
       res.json(results);
     }
   );
@@ -39,7 +39,7 @@ exports.assign = (req, res) => {
     'INSERT INTO mentor_mata_pelajaran (mentor_id, mata_pelajaran_id) VALUES (?, ?)',
     [mentor_id, mata_pelajaran_id],
     (err, result) => {
-      if (err) return res.status(500).json({ error: err });
+      if (err) return res.status(500).json({ error: err.message || 'Database error occurred' });
       res.json({ id: result.insertId, mentor_id, mata_pelajaran_id });
     }
   );
@@ -49,7 +49,7 @@ exports.assign = (req, res) => {
 exports.remove = (req, res) => {
   const { id } = req.params;
   db.query('DELETE FROM mentor_mata_pelajaran WHERE id = ?', [id], (err, result) => {
-    if (err) return res.status(500).json({ error: err });
+    if (err) return res.status(500).json({ error: err.message || 'Database error occurred' });
     res.json({ success: true });
   });
 }; 

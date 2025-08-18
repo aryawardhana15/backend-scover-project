@@ -4,15 +4,41 @@ const { generateToken } = require('../auth');
 
 exports.getAllMentors = (req, res) => {
   db.query('SELECT id, nama, email, foto_profil FROM mentors', (err, results) => {
-    if (err) return res.status(500).json({ error: err });
+    if (err) return res.status(500).json({ error: err.message || 'Database error occurred' });
     res.json(results);
+  });
+};
+
+exports.updateProfilePicture = (req, res) => {
+  const { id } = req.params;
+  const mentorIdFromToken = req.user.id;
+
+  // Pastikan mentor hanya bisa mengubah foto profilnya sendiri
+  if (parseInt(id, 10) !== mentorIdFromToken) {
+    return res.status(403).json({ error: 'Forbidden: You can only update your own profile picture.' });
+  }
+
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded.' });
+  }
+
+  const foto_profil = req.file.path.replace(/\\/g, "/");
+
+  db.query('UPDATE mentors SET foto_profil = ? WHERE id = ?', [foto_profil, id], (err, result) => {
+    if (err) return res.status(500).json({ error: err.message || 'Database error occurred' });
+    if (result.affectedRows === 0) return res.status(404).json({ error: 'Mentor not found' });
+
+    db.query('SELECT id, nama, email, foto_profil FROM mentors WHERE id = ?', [id], (err, results) => {
+      if (err) return res.status(500).json({ error: err.message || 'Database error occurred' });
+      res.json(results[0]);
+    });
   });
 };
 
 exports.createMentor = (req, res) => {
   const { nama, email, password, foto_profil } = req.body;
   db.query('INSERT INTO mentors (nama, email, password, foto_profil) VALUES (?, ?, ?, ?)', [nama, email, password, foto_profil], (err, result) => {
-    if (err) return res.status(500).json({ error: err });
+    if (err) return res.status(500).json({ error: err.message || 'Database error occurred' });
     res.json({ id: result.insertId, nama, email, foto_profil });
   });
 };
@@ -21,7 +47,7 @@ exports.createMentor = (req, res) => {
 exports.loginMentor = (req, res) => {
   const { email, password } = req.body;
   db.query('SELECT id, email, nama FROM mentors WHERE email = ? AND password = ?', [email, password], (err, results) => {
-    if (err) return res.status(500).json({ error: err });
+    if (err) return res.status(500).json({ error: err.message || 'Database error occurred' });
     if (results.length === 0) return res.status(401).json({ error: 'Login gagal' });
     const user = { id: results[0].id, email: results[0].email, nama: results[0].nama, role: 'mentor' };
     const token = generateToken(user);
@@ -32,7 +58,7 @@ exports.loginMentor = (req, res) => {
 exports.getMentorById = (req, res) => {
   const { id } = req.params;
   db.query('SELECT id, nama, email, foto_profil FROM mentors WHERE id = ?', [id], (err, results) => {
-    if (err) return res.status(500).json({ error: err });
+    if (err) return res.status(500).json({ error: err.message || 'Database error occurred' });
     if (results.length === 0) return res.status(404).json({ error: 'Mentor not found' });
     res.json(results[0]);
   });
@@ -49,7 +75,7 @@ exports.getJadwalMentor = (req, res) => {
      ORDER BY js.tanggal DESC`,
     [mentorId],
     (err, results) => {
-      if (err) return res.status(500).json({ error: err });
+      if (err) return res.status(500).json({ error: err.message || 'Database error occurred' });
       res.json(results);
     }
   );
@@ -103,7 +129,7 @@ exports.getAvailableMentors = (req, res) => {
   db.query(sql, [hari, sesi, mingguKe, mapel_id, tanggal, sesi], (err, results) => {
     if (err) {
       console.error('DB ERROR:', err);
-      return res.status(500).json({ error: err });
+      return res.status(500).json({ error: err.message || 'Database error occurred' });
     }
     console.log('Query results:', results);
     res.json(results);

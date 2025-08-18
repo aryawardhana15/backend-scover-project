@@ -13,4 +13,8 @@ router.get('/', authenticateJWT, requireRole('admin'), adminController.getAllAdm
 router.get('/current-week', authenticateJWT, adminController.getCurrentWeek);
 router.get('/stats', authenticateJWT, requireRole('admin'), adminController.getStats);
 
+// Routes to get all users and mentors for admin chat
+router.get('/users', authenticateJWT, requireRole('admin'), adminController.getAllUsers);
+router.get('/mentors', authenticateJWT, requireRole('admin'), adminController.getAllMentors);
+
 module.exports = router;
