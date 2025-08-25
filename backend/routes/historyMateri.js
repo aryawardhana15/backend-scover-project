@@ -7,5 +7,6 @@ router.get('/', authenticateToken, historyMateriController.getAllHistory);
 router.post('/', authenticateToken, historyMateriController.createHistory);
 
 router.get('/user/:user_id', authenticateToken, historyMateriController.getHistoryByUserId);
+router.get('/mentor/:mentor_id', authenticateToken, historyMateriController.getHistoryByMentorId);
 
 module.exports = router;
