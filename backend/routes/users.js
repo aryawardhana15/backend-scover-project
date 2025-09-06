@@ -6,6 +6,7 @@ const { authenticateJWT } = require('../auth');
 
 // Public routes
 router.post('/', usersController.createUser);
+router.post('/register', usersController.registerUser);
 router.post('/login', usersController.loginUser);
 
 // Protected routes

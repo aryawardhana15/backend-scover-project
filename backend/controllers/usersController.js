@@ -16,6 +16,25 @@ exports.createUser = (req, res) => {
   });
 };
 
+exports.registerUser = (req, res) => {
+  const { nama, email, password, role } = req.body;
+  
+  // Check if user already exists
+  db.query('SELECT id FROM users WHERE email = ?', [email], (err, results) => {
+    if (err) return res.status(500).json({ error: err.message || 'Database error occurred' });
+    if (results.length > 0) return res.status(400).json({ error: 'Email sudah terdaftar' });
+    
+    // Insert new user
+    db.query('INSERT INTO users (nama, email, password) VALUES (?, ?, ?)', [nama, email, password], (err, result) => {
+      if (err) return res.status(500).json({ error: err.message || 'Database error occurred' });
+      res.json({ 
+        message: 'Registrasi berhasil', 
+        user: { id: result.insertId, nama, email, role: 'user' } 
+      });
+    });
+  });
+};
+
 exports.loginUser = (req, res) => {
   const { email, password } = req.body;
   db.query('SELECT id, email, nama, kelas_id FROM users WHERE email = ? AND password = ?', [email, password], (err, results) => {

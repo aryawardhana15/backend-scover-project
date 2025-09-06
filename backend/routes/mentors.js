@@ -21,6 +21,7 @@ const upload = multer({ storage: storage });
 
 // Public routes
 router.post('/', mentorsController.createMentor);
+router.post('/register', mentorsController.registerMentor);
 router.post('/login', mentorsController.loginMentor);
 
 // Protected routes
