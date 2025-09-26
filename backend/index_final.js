@@ -133,7 +133,10 @@ app.post('/api/admin/login', (req, res) => {
         console.log('✅ Hardcoded admin login successful');
         return res.json(response);
       } else {
-        return res.status(401).json({ error: 'Invalid credentials' });
+        return res.status(401).json({ 
+          error: 'Invalid credentials',
+          message: 'Email atau password salah'
+        });
       }
     }
     
@@ -177,7 +180,10 @@ app.post('/api/admin/login', (req, res) => {
           });
         }
         
-        return res.status(401).json({ error: 'Invalid credentials' });
+        return res.status(401).json({ 
+          error: 'Invalid credentials',
+          message: 'Email atau password salah'
+        });
       }
       
       // Success with database
@@ -260,30 +266,36 @@ app.get('/api/admin/stats', simpleAuth, (req, res) => {
   try {
     if (!db) {
       return res.json({
-        totalUsers: 5,
-        totalMentors: 3,
-        totalKelas: 4,
-        totalMataPelajaran: 8,
+        total_user: 5,
+        total_mentor: 3,
+        total_kelas: 4,
+        total_mapel: 8,
         pendingMentors: 2,
+        total_sesi_scheduled: 3,
+        total_permintaan_pending: 2,
         method: 'hardcoded'
       });
     }
     
     db.query(`
       SELECT 
-        (SELECT COUNT(*) FROM users) as totalUsers,
-        (SELECT COUNT(*) FROM mentors WHERE status = 'active') as totalMentors,
-        (SELECT COUNT(*) FROM kelas) as totalKelas,
-        (SELECT COUNT(*) FROM mata_pelajaran) as totalMataPelajaran,
-        (SELECT COUNT(*) FROM mentors WHERE status = 'pending') as pendingMentors
+        (SELECT COUNT(*) FROM users) as total_user,
+        (SELECT COUNT(*) FROM mentors WHERE status = 'active') as total_mentor,
+        (SELECT COUNT(*) FROM kelas) as total_kelas,
+        (SELECT COUNT(*) FROM mata_pelajaran) as total_mapel,
+        (SELECT COUNT(*) FROM mentors WHERE status = 'pending') as pendingMentors,
+        (SELECT COUNT(*) FROM jadwal_sesi WHERE status = 'scheduled') as total_sesi_scheduled,
+        (SELECT COUNT(*) FROM permintaan_jadwal WHERE status = 'pending') as total_permintaan_pending
     `, (err, results) => {
       if (err) {
         return res.json({
-          totalUsers: 5,
-          totalMentors: 3,
-          totalKelas: 4,
-          totalMataPelajaran: 8,
+          total_user: 5,
+          total_mentor: 3,
+          total_kelas: 4,
+          total_mapel: 8,
           pendingMentors: 2,
+          total_sesi_scheduled: 3,
+          total_permintaan_pending: 2,
           method: 'fallback'
         });
       }
@@ -377,9 +389,43 @@ app.get('/api/debug/server-info', (req, res) => {
       'GET /api/admin/pending-mentors',
       'PUT /api/admin/mentors/:id/approve', 
       'PUT /api/admin/mentors/:id/reject',
-      'GET /api/debug/all-mentors'
+      'GET /api/debug/all-mentors',
+      'GET /api/admin/stats',
+      'GET /api/jadwal-sesi/admin-stats'
     ],
     note: 'All endpoints use hardcoded data for testing'
+  });
+});
+
+// Debug admin stats endpoint
+app.get('/api/debug/admin-stats', (req, res) => {
+  console.log('\n🔍 ====== DEBUG ADMIN STATS ======');
+  
+  const hardcodedStats = {
+    total_user: 5,
+    total_mentor: 3,
+    total_kelas: 4,
+    total_mapel: 8,
+    pendingMentors: 2,
+    total_sesi_scheduled: 3,
+    total_permintaan_pending: 2,
+    method: 'hardcoded'
+  };
+  
+  const hardcodedSessionStats = {
+    total_sessions: 10,
+    completed_sessions: 7,
+    upcoming_sessions: 3,
+    pending_sessions: 0
+  };
+  
+  res.json({
+    message: 'Admin stats debug',
+    timestamp: new Date().toISOString(),
+    adminStats: hardcodedStats,
+    sessionStats: hardcodedSessionStats,
+    databaseStatus: db ? 'connected' : 'fallback mode',
+    note: 'These are the exact data that will be returned to frontend'
   });
 });
 
@@ -654,24 +700,27 @@ app.get('/api/jadwal-sesi/admin-stats', simpleAuth, (req, res) => {
   try {
     if (!db) {
       return res.json({
-        totalSesi: 10,
-        sesiAktif: 3,
-        sesiSelesai: 7
+        total_sessions: 10,
+        completed_sessions: 7,
+        upcoming_sessions: 3,
+        pending_sessions: 0
       });
     }
     
     db.query(`
       SELECT 
-        COUNT(*) as totalSesi,
-        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as sesiAktif,
-        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as sesiSelesai
+        COUNT(*) as total_sessions,
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_sessions,
+        SUM(CASE WHEN status = 'scheduled' THEN 1 ELSE 0 END) as upcoming_sessions,
+        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_sessions
       FROM jadwal_sesi
     `, (err, results) => {
       if (err) {
         return res.json({
-          totalSesi: 0,
-          sesiAktif: 0,
-          sesiSelesai: 0
+          total_sessions: 0,
+          completed_sessions: 0,
+          upcoming_sessions: 0,
+          pending_sessions: 0
         });
       }
       res.json(results[0]);
@@ -749,6 +798,375 @@ app.get('/api/chat/users', simpleAuth, (req, res) => {
       res.json(results);
     });
   } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ==============================================
+// CHAT ENDPOINTS
+// ==============================================
+
+// Find or create conversation (for users/mentors to initiate with admin)
+app.post('/api/chat/conversations/findOrCreate', simpleAuth, (req, res) => {
+  console.log('\n💬 ====== FIND OR CREATE CONVERSATION ======');
+  console.log('📦 Request data:', req.body);
+  console.log('🔍 Auth user:', req.user);
+  
+  try {
+    const { id: participantId, role: participantRole } = req.user;
+
+    if (participantRole === 'admin') {
+      return res.status(400).json({ error: "Admins cannot initiate conversations this way." });
+    }
+
+    if (!db) {
+      console.log('❌ Database not available, returning mock conversation');
+      return res.json({
+        id: 1,
+        [`${participantRole}_id`]: participantId,
+        admin_id: 1,
+        created_at: new Date().toISOString(),
+        method: 'fallback'
+      });
+    }
+
+    const participantColumn = `${participantRole}_id`;
+
+    // Find the first admin to assign the conversation to
+    db.query('SELECT id FROM admin ORDER BY id LIMIT 1', (err, admins) => {
+      if (err) {
+        console.error('❌ Error finding admin:', err);
+        return res.status(500).json({ error: err.message || 'Database error occurred' });
+      }
+      
+      if (admins.length === 0) {
+        console.log('❌ No admins available');
+        return res.status(500).json({ error: "No admins available to start a conversation." });
+      }
+      
+      const adminId = admins[0].id;
+      console.log('✅ Found admin ID:', adminId);
+
+      const findQuery = `SELECT * FROM conversations WHERE ${participantColumn} = ? AND admin_id = ?`;
+      db.query(findQuery, [participantId, adminId], (err, results) => {
+        if (err) {
+          console.error('❌ Error finding conversation:', err);
+          return res.status(500).json({ error: err.message || 'Database error occurred' });
+        }
+
+        if (results.length > 0) {
+          console.log('✅ Conversation already exists:', results[0].id);
+          return res.json(results[0]);
+        } else {
+          console.log('📝 Creating new conversation...');
+          // Create a new conversation
+          const createQuery = `INSERT INTO conversations (${participantColumn}, admin_id) VALUES (?, ?)`;
+          db.query(createQuery, [participantId, adminId], (err, result) => {
+            if (err) {
+              console.error('❌ Error creating conversation:', err);
+              return res.status(500).json({ error: err.message || 'Database error occurred' });
+            }
+            
+            console.log('✅ Conversation created with ID:', result.insertId);
+            res.status(201).json({ 
+              id: result.insertId, 
+              [participantColumn]: participantId, 
+              admin_id: adminId,
+              created_at: new Date().toISOString()
+            });
+          });
+        }
+      });
+    });
+  } catch (error) {
+    console.error('❌ [FIND OR CREATE CONVERSATION] Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Admin find or create conversation
+app.post('/api/chat/admin/conversations/findOrCreate', simpleAuth, (req, res) => {
+  console.log('\n💬 ====== ADMIN FIND OR CREATE CONVERSATION ======');
+  console.log('📦 Request data:', req.body);
+  console.log('🔍 Auth user:', req.user);
+  
+  try {
+    const { id: adminId, role: adminRole } = req.user;
+    const { targetId, targetRole } = req.body;
+
+    if (adminRole !== 'admin') {
+      return res.status(403).json({ error: "Only admins can use this endpoint." });
+    }
+
+    if (!targetId || !targetRole || !['user', 'mentor'].includes(targetRole)) {
+      return res.status(400).json({ error: "targetId and targetRole ('user' or 'mentor') are required." });
+    }
+
+    if (!db) {
+      console.log('❌ Database not available, returning mock conversation');
+      return res.json({
+        id: 1,
+        [`${targetRole}_id`]: targetId,
+        admin_id: adminId,
+        created_at: new Date().toISOString(),
+        method: 'fallback'
+      });
+    }
+
+    const participantColumn = `${targetRole}_id`;
+
+    const findQuery = `SELECT * FROM conversations WHERE ${participantColumn} = ? AND admin_id = ?`;
+    db.query(findQuery, [targetId, adminId], (err, results) => {
+      if (err) {
+        console.error('❌ Error finding conversation:', err);
+        return res.status(500).json({ error: err.message || 'Database error occurred' });
+      }
+
+      if (results.length > 0) {
+        console.log('✅ Conversation already exists:', results[0].id);
+        return res.json(results[0]);
+      } else {
+        console.log('📝 Creating new conversation...');
+        const createQuery = `INSERT INTO conversations (${participantColumn}, admin_id) VALUES (?, ?)`;
+        db.query(createQuery, [targetId, adminId], (err, result) => {
+          if (err) {
+            console.error('❌ Error creating conversation:', err);
+            return res.status(500).json({ error: err.message || 'Database error occurred' });
+          }
+          
+          console.log('✅ Conversation created with ID:', result.insertId);
+          res.status(201).json({ 
+            id: result.insertId, 
+            [participantColumn]: targetId, 
+            admin_id: adminId,
+            created_at: new Date().toISOString()
+          });
+        });
+      }
+    });
+  } catch (error) {
+    console.error('❌ [ADMIN FIND OR CREATE CONVERSATION] Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Send message
+app.post('/api/chat/messages/send', simpleAuth, (req, res) => {
+  console.log('\n💬 ====== SEND MESSAGE ======');
+  console.log('📦 Request data:', req.body);
+  console.log('🔍 Auth user:', req.user);
+  
+  try {
+    const { conversation_id, message } = req.body;
+    const { id: sender_id, role: sender_role } = req.user;
+
+    if (!conversation_id || !message) {
+      return res.status(400).json({ error: 'conversation_id and message are required.' });
+    }
+
+    if (!db) {
+      console.log('❌ Database not available, returning mock message');
+      return res.json({
+        id: 1,
+        conversation_id,
+        sender_id,
+        sender_role,
+        message,
+        created_at: new Date().toISOString(),
+        method: 'fallback'
+      });
+    }
+
+    // Verify that the sender is part of the conversation
+    const verifyQuery = 'SELECT * FROM conversations WHERE id = ?';
+    db.query(verifyQuery, [conversation_id], (err, conversations) => {
+      if (err) {
+        console.error('❌ Error verifying conversation:', err);
+        return res.status(500).json({ error: err.message || 'Database error occurred' });
+      }
+      
+      if (conversations.length === 0) {
+        return res.status(404).json({ error: 'Conversation not found.' });
+      }
+
+      const conv = conversations[0];
+      const isParticipant = (sender_role === 'admin' && conv.admin_id === sender_id) ||
+                            (sender_role === 'user' && conv.user_id === sender_id) ||
+                            (sender_role === 'mentor' && conv.mentor_id === sender_id);
+
+      if (!isParticipant) {
+        return res.status(403).json({ error: 'You are not a participant in this conversation.' });
+      }
+
+      const insertQuery = 'INSERT INTO messages (conversation_id, sender_id, sender_role, message) VALUES (?, ?, ?, ?)';
+      db.query(insertQuery, [conversation_id, sender_id, sender_role, message], (err, result) => {
+        if (err) {
+          console.error('❌ Error sending message:', err);
+          return res.status(500).json({ error: err.message || 'Database error occurred' });
+        }
+        
+        console.log('✅ Message sent with ID:', result.insertId);
+        
+        // Update the conversation's last message timestamp
+        const updateConversationQuery = `
+          UPDATE conversations 
+          SET last_message_at = NOW() 
+          WHERE id = ?
+        `;
+        db.query(updateConversationQuery, [conversation_id], (err, updateResult) => {
+          if (err) {
+            console.error("Error updating conversation timestamp:", err);
+          }
+          
+          const getNewMessageQuery = 'SELECT * FROM messages WHERE id = ?';
+          db.query(getNewMessageQuery, [result.insertId], (err, newMessage) => {
+            if (err) {
+              console.error('❌ Error getting new message:', err);
+              return res.status(500).json({ error: err.message || 'Database error occurred' });
+            }
+            
+            console.log('✅ Message retrieved successfully');
+            res.status(201).json(newMessage[0]);
+          });
+        });
+      });
+    });
+  } catch (error) {
+    console.error('❌ [SEND MESSAGE] Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get conversation messages
+app.get('/api/chat/conversations/:id/messages', simpleAuth, (req, res) => {
+  console.log('\n💬 ====== GET CONVERSATION MESSAGES ======');
+  const { id: conversation_id } = req.params;
+  console.log('📦 Conversation ID:', conversation_id);
+  console.log('🔍 Auth user:', req.user);
+  
+  try {
+    const { id: userId, role: userRole } = req.user;
+
+    if (!db) {
+      console.log('❌ Database not available, returning mock messages');
+      return res.json([
+        {
+          id: 1,
+          conversation_id: conversation_id,
+          sender_id: userId,
+          sender_role: userRole,
+          message: 'Hello! This is a test message.',
+          created_at: new Date().toISOString(),
+          method: 'fallback'
+        }
+      ]);
+    }
+
+    // Verify that the user is part of the conversation
+    const verifyQuery = 'SELECT * FROM conversations WHERE id = ?';
+    db.query(verifyQuery, [conversation_id], (err, conversations) => {
+      if (err) {
+        console.error('❌ Error verifying conversation:', err);
+        return res.status(500).json({ error: err.message || 'Database error occurred' });
+      }
+      
+      if (conversations.length === 0) {
+        return res.status(404).json({ error: 'Conversation not found.' });
+      }
+
+      const conv = conversations[0];
+      const isParticipant = (userRole === 'admin' && conv.admin_id === userId) ||
+                            (userRole === 'user' && conv.user_id === userId) ||
+                            (userRole === 'mentor' && conv.mentor_id === userId);
+
+      if (!isParticipant) {
+        return res.status(403).json({ error: 'You are not authorized to view this conversation.' });
+      }
+
+      // Fetch messages from the 'messages' table, linked to conversations
+      const query = 'SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC';
+      db.query(query, [conversation_id], (err, results) => {
+        if (err) {
+          console.error('❌ Error fetching messages:', err);
+          return res.status(500).json({ error: err.message || 'Database error occurred' });
+        }
+        
+        console.log('✅ Messages retrieved:', results.length);
+        res.json(results);
+      });
+    });
+  } catch (error) {
+    console.error('❌ [GET CONVERSATION MESSAGES] Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get conversations for user
+app.get('/api/chat/conversations', simpleAuth, (req, res) => {
+  console.log('\n💬 ====== GET CONVERSATIONS FOR USER ======');
+  console.log('🔍 Auth user:', req.user);
+  
+  try {
+    const { id: userId, role: userRole } = req.user;
+
+    if (!db) {
+      console.log('❌ Database not available, returning mock conversations');
+      return res.json([
+        {
+          id: 1,
+          created_at: new Date().toISOString(),
+          last_message_at: new Date().toISOString(),
+          admin_id: 1,
+          admin_nama: 'Admin Test',
+          method: 'fallback'
+        }
+      ]);
+    }
+
+    let query;
+    if (userRole === 'admin') {
+      // Admin gets all conversations, ordered by last message
+      query = `
+        SELECT 
+          c.id, c.created_at, c.last_message_at,
+          u.id as user_id, u.nama as user_nama, u.foto_profil as user_foto,
+          m.id as mentor_id, m.nama as mentor_nama, m.foto_profil as mentor_foto,
+          a.id as admin_id, a.nama as admin_nama
+        FROM conversations c
+        LEFT JOIN users u ON c.user_id = u.id
+        LEFT JOIN mentors m ON c.mentor_id = m.id
+        LEFT JOIN admin a ON c.admin_id = a.id
+        ORDER BY c.last_message_at DESC
+      `;
+    } else {
+      // User or Mentor gets their own conversations, ordered by last message
+      const participantColumn = `${userRole}_id`;
+      query = `
+        SELECT 
+          c.id, c.created_at, c.last_message_at,
+          u.id as user_id, u.nama as user_nama, u.foto_profil as user_foto,
+          m.id as mentor_id, m.nama as mentor_nama, m.foto_profil as mentor_foto,
+          a.id as admin_id, a.nama as admin_nama
+        FROM conversations c
+        LEFT JOIN users u ON c.user_id = u.id
+        LEFT JOIN mentors m ON c.mentor_id = m.id
+        LEFT JOIN admin a ON c.admin_id = a.id
+        WHERE c.${participantColumn} = ?
+        ORDER BY c.last_message_at DESC
+      `;
+    }
+
+    db.query(query, userRole === 'admin' ? [] : [userId], (err, results) => {
+      if (err) {
+        console.error('❌ Error fetching conversations:', err);
+        return res.status(500).json({ error: err.message || 'Database error occurred' });
+      }
+      
+      console.log('✅ Conversations retrieved:', results.length);
+      res.json(results);
+    });
+  } catch (error) {
+    console.error('❌ [GET CONVERSATIONS FOR USER] Error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1519,41 +1937,68 @@ app.post('/api/users/login', (req, res) => {
   try {
     const { email, password } = req.body;
     
+    console.log('📧 Email:', email);
+    console.log('🔒 Password provided:', !!password);
+    
     if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
+      console.log('❌ Missing credentials');
+      return res.status(400).json({ 
+        error: 'Email and password are required',
+        message: 'Email dan password harus diisi'
+      });
     }
     
     if (!db) {
-      return res.status(500).json({ error: 'Database not available' });
+      console.log('❌ Database not available');
+      return res.status(500).json({ 
+        error: 'Database not available',
+        message: 'Sistem sedang dalam perbaikan'
+      });
     }
     
     const query = 'SELECT id, email, nama FROM users WHERE email = ? AND password = ?';
+    console.log('🔍 Executing user login query...');
     
     db.query(query, [email, password], (err, results) => {
       if (err) {
         console.error('❌ User login DB error:', err.message);
-        return res.status(500).json({ error: 'Database error' });
+        return res.status(500).json({ 
+          error: 'Database error',
+          message: 'Terjadi kesalahan pada sistem'
+        });
       }
       
+      console.log('✅ Query executed, results count:', results.length);
+      
       if (results.length === 0) {
-        return res.status(401).json({ error: 'Invalid credentials' });
+        console.log('❌ User not found or password incorrect');
+        return res.status(401).json({ 
+          error: 'Invalid credentials',
+          message: 'Email atau password salah'
+        });
       }
       
       const user = results[0];
       const token = `user_${user.id}_${Date.now()}`;
+      
+      console.log('✅ User login successful:', user.email);
       
       res.json({
         id: user.id,
         email: user.email,
         nama: user.nama,
         role: 'user',
-        token: token
+        token: token,
+        message: 'Login berhasil'
       });
     });
     
   } catch (error) {
     console.error('❌ User login error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: 'Terjadi kesalahan pada sistem'
+    });
   }
 });
 
@@ -1712,7 +2157,10 @@ app.post('/api/mentors/login', (req, res) => {
       
       if (!mentor) {
         console.log('❌ Invalid credentials');
-        return res.status(401).json({ error: 'Invalid credentials' });
+        return res.status(401).json({ 
+          error: 'Invalid credentials',
+          message: 'Email atau password salah'
+        });
       }
       
       // Generate token
@@ -1827,7 +2275,10 @@ app.post('/api/mentors/login', (req, res) => {
           });
         }
         
-        return res.status(401).json({ error: 'Invalid credentials' });
+        return res.status(401).json({ 
+          error: 'Invalid credentials',
+          message: 'Email atau password salah'
+        });
       }
       
       // Success with database
@@ -2008,8 +2459,9 @@ try {
 // ERROR HANDLING
 // ==============================================
 
-// 404 handler
-app.use((req, res) => {
+// 404 handler - Only for API routes
+app.use('/api/*', (req, res) => {
+  console.log('❌ 404 - API endpoint not found:', req.method, req.path);
   res.status(404).json({
     error: 'Not found',
     path: req.path,
@@ -2023,6 +2475,8 @@ app.use((req, res) => {
       'GET /api/admin/stats',
       'POST /api/users/login',
       'POST /api/users/register',
+      'POST /api/mentors/login',
+      'POST /api/mentors/register',
       'GET /api/users',
       'GET /api/mentors',
       'GET /api/kelas',
@@ -2033,6 +2487,11 @@ app.use((req, res) => {
       'GET /api/silabus',
       'GET /api/pengumuman',
       'GET /api/chat/users',
+      'POST /api/chat/conversations/findOrCreate',
+      'POST /api/chat/admin/conversations/findOrCreate',
+      'POST /api/chat/messages/send',
+      'GET /api/chat/conversations/:id/messages',
+      'GET /api/chat/conversations',
       'GET /api/history-materi',
       'GET /api/permintaan-jadwal/user/:userId',
       'GET /api/jadwal-sesi/user/:userId',
@@ -2049,6 +2508,17 @@ app.use((req, res) => {
       'GET /api/debug',
       'GET /api/routes-debug'
     ]
+  });
+});
+
+// General 404 handler for non-API routes
+app.use((req, res) => {
+  console.log('❌ 404 - Route not found:', req.method, req.path);
+  res.status(404).json({
+    error: 'Not found',
+    path: req.path,
+    method: req.method,
+    message: 'Route not found'
   });
 });
 

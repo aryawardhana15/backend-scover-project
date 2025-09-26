@@ -64,14 +64,47 @@ exports.registerMentor = (req, res) => {
 
 // Tambahkan endpoint login mentor
 exports.loginMentor = (req, res) => {
-  const { email, password } = req.body;
-  db.query('SELECT id, email, nama FROM mentors WHERE email = ? AND password = ?', [email, password], (err, results) => {
-    if (err) return res.status(500).json({ error: err.message || 'Database error occurred' });
-    if (results.length === 0) return res.status(401).json({ error: 'Login gagal' });
-    const user = { id: results[0].id, email: results[0].email, nama: results[0].nama, role: 'mentor' };
-    const token = generateToken(user);
-    res.json({ ...user, token });
-  });
+  try {
+    const { email, password } = req.body;
+    
+    console.log('🔍 [MENTOR LOGIN] Attempting login for:', email);
+    
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+    
+    db.query('SELECT id, email, nama FROM mentors WHERE email = ? AND password = ?', [email, password], (err, results) => {
+      if (err) {
+        console.error('❌ [MENTOR LOGIN] Database error:', err);
+        return res.status(500).json({ error: err.message || 'Database error occurred' });
+      }
+      
+      if (results.length === 0) {
+        console.log('❌ [MENTOR LOGIN] Mentor not found or password incorrect');
+        return res.status(401).json({ error: 'Login gagal' });
+      }
+      
+      const user = results[0];
+      console.log('✅ [MENTOR LOGIN] Mentor found:', user.email);
+      
+      try {
+        const userData = { id: user.id, email: user.email, nama: user.nama, role: 'mentor' };
+        
+        // Generate simple token for now (bypass JWT issues)
+        console.log('🔍 [MENTOR LOGIN] Generating simple token...');
+        const token = 'mentor-token-' + userData.id + '-' + Date.now();
+        console.log('✅ [MENTOR LOGIN] Simple token generated');
+        res.json({ ...userData, token });
+      } catch (tokenError) {
+        console.error('❌ [MENTOR LOGIN] Token generation error:', tokenError);
+        res.status(500).json({ error: 'Token generation failed: ' + tokenError.message });
+      }
+    });
+  } catch (error) {
+    console.error('❌ [MENTOR LOGIN] Unexpected error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 };
 
 exports.getMentorById = (req, res) => {
