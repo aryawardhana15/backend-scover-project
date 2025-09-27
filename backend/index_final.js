@@ -3,26 +3,35 @@ const cors = require('cors');
 const path = require('path');
 const app = express();
 
-// CORS Configuration
-app.use(cors({
-  origin: '*',
+// CORS Configuration - Fixed to prevent middleware conflict
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001', 
+  'https://myscover.my.id',
+  'https://www.myscover.my.id',
+  'https://api2.myscover.my.id',
+  'https://dashboard.myscover.my.id'
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests without origin (like Postman or mobile apps)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
   credentials: false
-}));
+};
 
-// Additional CORS headers
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, Origin, X-Requested-With');
-  
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  
-  next();
-});
+// Use only one CORS middleware to prevent conflict
+app.use(cors(corsOptions));
 
 // Body parsers
 app.use(express.json({ limit: '50mb' }));
@@ -39,6 +48,10 @@ app.get('/', (req, res) => {
     version: '2.0.0',
     timestamp: new Date().toISOString(),
     file: 'index_final.js',
+    cors: {
+      origin: req.headers.origin || 'no-origin',
+      userAgent: req.headers['user-agent'] || 'no-user-agent'
+    },
     endpoints: {
       health: '/',
       adminLogin: '/api/admin/login',
@@ -64,7 +77,6 @@ app.get('/', (req, res) => {
       permintaanJadwal: '/api/permintaan-jadwal',
       silabus: '/api/silabus',
       pengumuman: '/api/pengumuman',
-      chatUsers: '/api/chat/users',
       historyMateri: '/api/history-materi',
       userPermintaan: '/api/permintaan-jadwal/user/:userId',
       userJadwal: '/api/jadwal-sesi/user/:userId',
@@ -84,6 +96,115 @@ app.get('/', (req, res) => {
       notifikasi: '/api/notifikasi'
     }
   });
+});
+
+// CORS Debug endpoint
+app.get('/api/debug/cors', (req, res) => {
+  res.json({
+    status: 'ok',
+    message: 'CORS Debug Info',
+    timestamp: new Date().toISOString(),
+    headers: {
+      origin: req.headers.origin,
+      'user-agent': req.headers['user-agent'],
+      'access-control-request-method': req.headers['access-control-request-method'],
+      'access-control-request-headers': req.headers['access-control-request-headers']
+    },
+    cors: {
+      allowedOrigins: [
+        'http://localhost:3000',
+        'http://localhost:3001', 
+        'https://myscover.my.id',
+        'https://www.myscover.my.id',
+        'https://api2.myscover.my.id',
+        'https://dashboard.myscover.my.id'
+      ],
+      currentOrigin: req.headers.origin,
+      isAllowed: [
+        'http://localhost:3000',
+        'http://localhost:3001', 
+        'https://myscover.my.id',
+        'https://www.myscover.my.id',
+        'https://api2.myscover.my.id',
+        'https://dashboard.myscover.my.id'
+      ].includes(req.headers.origin)
+    }
+  });
+});
+
+// Debug Health endpoint
+app.get('/api/debug/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    message: 'Debug Health Check',
+    timestamp: new Date().toISOString(),
+    server: 'EduMentor API',
+    version: '2.0.0',
+    database: db ? 'connected' : 'disconnected',
+    cors: {
+      origin: req.headers.origin,
+      allowed: true
+    }
+  });
+});
+
+// Debug FormData Test endpoint
+app.post('/api/debug/formdata-test', (req, res) => {
+  console.log('🧪 [DEBUG] FormData test received');
+  console.log('📦 Request body:', req.body);
+  console.log('📋 Request headers:', req.headers);
+  
+  res.json({
+    status: 'ok',
+    message: 'FormData test successful',
+    timestamp: new Date().toISOString(),
+    receivedData: {
+      body: req.body,
+      contentType: req.headers['content-type'],
+      contentLength: req.headers['content-length']
+    }
+  });
+});
+
+// Public pengumuman endpoint (no auth required for testing)
+app.get('/api/pengumuman/public', (req, res) => {
+  try {
+    console.log('📢 [PENGUMUMAN PUBLIC] Fetching pengumuman (no auth)');
+    
+    if (!db) {
+      console.log('⚠️ [PENGUMUMAN PUBLIC] Database not available, returning mock data');
+      return res.json([
+        {
+          id: 1,
+          judul: 'Selamat Datang di EduMentor',
+          isi: 'Selamat datang di platform EduMentor! Platform pembelajaran online yang memudahkan proses belajar mengajar.',
+          gambar_url: null,
+          created_at: new Date().toISOString()
+        },
+        {
+          id: 2,
+          judul: 'Jadwal Ujian Tengah Semester',
+          isi: 'Ujian Tengah Semester akan dilaksanakan pada tanggal 15-20 Maret 2024. Silakan persiapkan diri dengan baik.',
+          gambar_url: null,
+          created_at: new Date().toISOString()
+        }
+      ]);
+    }
+    
+    db.query('SELECT * FROM pengumuman ORDER BY created_at DESC', (err, results) => {
+      if (err) {
+        console.error('❌ [PENGUMUMAN PUBLIC] Database error:', err);
+        return res.json([]);
+      }
+      
+      console.log('✅ [PENGUMUMAN PUBLIC] Fetched', results.length, 'pengumuman');
+      res.json(results);
+    });
+    
+  } catch (error) {
+    console.error('❌ [PENGUMUMAN PUBLIC] Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // ==============================================
@@ -391,7 +512,8 @@ app.get('/api/debug/server-info', (req, res) => {
       'PUT /api/admin/mentors/:id/reject',
       'GET /api/debug/all-mentors',
       'GET /api/admin/stats',
-      'GET /api/jadwal-sesi/admin-stats'
+      'GET /api/jadwal-sesi/admin-stats',
+      'GET /api/mentors/available'
     ],
     note: 'All endpoints use hardcoded data for testing'
   });
@@ -755,13 +877,296 @@ app.get('/api/silabus', simpleAuth, (req, res) => {
       return res.json([]);
     }
     
-    db.query('SELECT * FROM silabus', (err, results) => {
+    db.query('SELECT * FROM silabus ORDER BY created_at DESC', (err, results) => {
       if (err) {
         return res.json([]);
       }
       res.json(results);
     });
   } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST Silabus endpoint - Create new silabus
+app.post('/api/silabus', simpleAuth, (req, res) => {
+  try {
+    console.log('\n📚 ====== CREATE SILABUS ======');
+    console.log('📦 Request data:', req.body);
+    console.log('👤 Auth user:', req.user);
+    
+    const { nama, deskripsi } = req.body;
+    
+    // Validate required fields
+    if (!nama || !deskripsi) {
+      console.log('❌ Validation failed - missing required fields');
+      return res.status(400).json({ 
+        error: 'Nama dan deskripsi silabus wajib diisi' 
+      });
+    }
+    
+    if (!db) {
+      console.log('📦 Using fallback mode (no database)');
+      return res.json({
+        message: 'Silabus berhasil dibuat',
+        id: 'temp_' + Date.now(),
+        nama,
+        deskripsi,
+        method: 'fallback'
+      });
+    }
+    
+    console.log('📦 Using database mode');
+    
+    // Check if silabus with same name already exists
+    const checkQuery = 'SELECT id FROM silabus WHERE nama = ?';
+    console.log('🔍 Checking existing silabus with query:', checkQuery, 'nama:', nama);
+    
+    db.query(checkQuery, [nama], (err, results) => {
+      if (err) {
+        console.error('❌ DB Error during check:', err);
+        return res.status(500).json({ 
+          error: 'Database error during name check',
+          details: err.message
+        });
+      }
+      
+      console.log('✅ Name check completed, results:', results);
+      
+      if (results.length > 0) {
+        console.log('❌ Silabus with same name already exists');
+        return res.status(400).json({ error: 'Silabus dengan nama yang sama sudah ada' });
+      }
+      
+      // Insert new silabus
+      const insertQuery = 'INSERT INTO silabus (nama, deskripsi) VALUES (?, ?)';
+      const insertValues = [nama, deskripsi];
+      
+      console.log('🔍 Inserting silabus with query:', insertQuery, 'values:', insertValues);
+      
+      db.query(insertQuery, insertValues, (err, result) => {
+        if (err) {
+          console.error('❌ Insert Error:', err);
+          return res.status(500).json({ 
+            error: 'Gagal membuat silabus',
+            details: err.message
+          });
+        }
+        
+        console.log('✅ Silabus created successfully, insertId:', result.insertId);
+        
+        res.json({
+          message: 'Silabus berhasil dibuat',
+          id: result.insertId,
+          nama,
+          deskripsi,
+          created_at: new Date().toISOString()
+        });
+      });
+    });
+    
+  } catch (error) {
+    console.error('❌ Error in POST /api/silabus:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT Silabus endpoint - Update existing silabus
+app.put('/api/silabus/:id', simpleAuth, (req, res) => {
+  try {
+    console.log('\n📚 ====== UPDATE SILABUS ======');
+    console.log('📦 Request data:', req.body);
+    console.log('🆔 Silabus ID:', req.params.id);
+    console.log('👤 Auth user:', req.user);
+    
+    const { id } = req.params;
+    const { nama, deskripsi } = req.body;
+    
+    // Validate required fields
+    if (!nama || !deskripsi) {
+      console.log('❌ Validation failed - missing required fields');
+      return res.status(400).json({ 
+        error: 'Nama dan deskripsi silabus wajib diisi' 
+      });
+    }
+    
+    if (!db) {
+      console.log('📦 Using fallback mode (no database)');
+      return res.json({
+        message: 'Silabus berhasil diperbarui',
+        id: id,
+        nama,
+        deskripsi,
+        method: 'fallback'
+      });
+    }
+    
+    console.log('📦 Using database mode');
+    
+    // Check if silabus exists
+    const checkQuery = 'SELECT id FROM silabus WHERE id = ?';
+    console.log('🔍 Checking existing silabus with query:', checkQuery, 'id:', id);
+    
+    db.query(checkQuery, [id], (err, results) => {
+      if (err) {
+        console.error('❌ DB Error during check:', err);
+        return res.status(500).json({ 
+          error: 'Database error during silabus check',
+          details: err.message
+        });
+      }
+      
+      console.log('✅ Silabus check completed, results:', results);
+      
+      if (results.length === 0) {
+        console.log('❌ Silabus not found');
+        return res.status(404).json({ error: 'Silabus tidak ditemukan' });
+      }
+      
+      // Check if another silabus with same name exists (excluding current one)
+      const nameCheckQuery = 'SELECT id FROM silabus WHERE nama = ? AND id != ?';
+      console.log('🔍 Checking name conflict with query:', nameCheckQuery, 'nama:', nama, 'id:', id);
+      
+      db.query(nameCheckQuery, [nama, id], (err, nameResults) => {
+        if (err) {
+          console.error('❌ DB Error during name check:', err);
+          return res.status(500).json({ 
+            error: 'Database error during name check',
+            details: err.message
+          });
+        }
+        
+        if (nameResults.length > 0) {
+          console.log('❌ Silabus with same name already exists');
+          return res.status(400).json({ error: 'Silabus dengan nama yang sama sudah ada' });
+        }
+        
+        // Update silabus
+        const updateQuery = 'UPDATE silabus SET nama = ?, deskripsi = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?';
+        const updateValues = [nama, deskripsi, id];
+        
+        console.log('🔍 Updating silabus with query:', updateQuery, 'values:', updateValues);
+        
+        db.query(updateQuery, updateValues, (err, result) => {
+          if (err) {
+            console.error('❌ Update Error:', err);
+            return res.status(500).json({ 
+              error: 'Gagal memperbarui silabus',
+              details: err.message
+            });
+          }
+          
+          console.log('✅ Silabus updated successfully, affectedRows:', result.affectedRows);
+          
+          res.json({
+            message: 'Silabus berhasil diperbarui',
+            id: parseInt(id),
+            nama,
+            deskripsi,
+            updated_at: new Date().toISOString()
+          });
+        });
+      });
+    });
+    
+  } catch (error) {
+    console.error('❌ Error in PUT /api/silabus/:id:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE Silabus endpoint - Delete silabus
+app.delete('/api/silabus/:id', simpleAuth, (req, res) => {
+  try {
+    console.log('\n📚 ====== DELETE SILABUS ======');
+    console.log('🆔 Silabus ID:', req.params.id);
+    console.log('👤 Auth user:', req.user);
+    
+    const { id } = req.params;
+    
+    if (!db) {
+      console.log('📦 Using fallback mode (no database)');
+      return res.json({
+        message: 'Silabus berhasil dihapus',
+        id: id,
+        method: 'fallback'
+      });
+    }
+    
+    console.log('📦 Using database mode');
+    
+    // Check if silabus exists
+    const checkQuery = 'SELECT id, nama FROM silabus WHERE id = ?';
+    console.log('🔍 Checking existing silabus with query:', checkQuery, 'id:', id);
+    
+    db.query(checkQuery, [id], (err, results) => {
+      if (err) {
+        console.error('❌ DB Error during check:', err);
+        return res.status(500).json({ 
+          error: 'Database error during silabus check',
+          details: err.message
+        });
+      }
+      
+      console.log('✅ Silabus check completed, results:', results);
+      
+      if (results.length === 0) {
+        console.log('❌ Silabus not found');
+        return res.status(404).json({ error: 'Silabus tidak ditemukan' });
+      }
+      
+      const silabusData = results[0];
+      console.log('📚 Found silabus:', silabusData);
+      
+      // Check if silabus is being used in history_materi
+      const usageCheckQuery = 'SELECT COUNT(*) as count FROM history_materi WHERE silabus_id = ?';
+      console.log('🔍 Checking silabus usage with query:', usageCheckQuery, 'id:', id);
+      
+      db.query(usageCheckQuery, [id], (err, usageResults) => {
+        if (err) {
+          console.error('❌ DB Error during usage check:', err);
+          return res.status(500).json({ 
+            error: 'Database error during usage check',
+            details: err.message
+          });
+        }
+        
+        const usageCount = usageResults[0].count;
+        console.log('📊 Silabus usage count:', usageCount);
+        
+        if (usageCount > 0) {
+          console.log('❌ Silabus is being used in history materi');
+          return res.status(400).json({ 
+            error: `Silabus tidak dapat dihapus karena sedang digunakan dalam ${usageCount} laporan belajar. Hapus laporan belajar terlebih dahulu.` 
+          });
+        }
+        
+        // Delete silabus
+        const deleteQuery = 'DELETE FROM silabus WHERE id = ?';
+        console.log('🔍 Deleting silabus with query:', deleteQuery, 'id:', id);
+        
+        db.query(deleteQuery, [id], (err, result) => {
+          if (err) {
+            console.error('❌ Delete Error:', err);
+            return res.status(500).json({ 
+              error: 'Gagal menghapus silabus',
+              details: err.message
+            });
+          }
+          
+          console.log('✅ Silabus deleted successfully, affectedRows:', result.affectedRows);
+          
+          res.json({
+            message: 'Silabus berhasil dihapus',
+            id: parseInt(id),
+            nama: silabusData.nama
+          });
+        });
+      });
+    });
+    
+  } catch (error) {
+    console.error('❌ Error in DELETE /api/silabus/:id:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -784,198 +1189,103 @@ app.get('/api/pengumuman', simpleAuth, (req, res) => {
   }
 });
 
-// Chat users endpoint
-app.get('/api/chat/users', simpleAuth, (req, res) => {
+// Public POST pengumuman endpoint (no auth required for testing)
+app.post('/api/pengumuman/public', (req, res) => {
   try {
+    console.log('📢 [PENGUMUMAN PUBLIC POST] Creating pengumuman (no auth)');
+    console.log('📦 Request body:', req.body);
+    
+    const { judul, isi } = req.body;
+    
+    // Validation
+    if (!judul || !isi) {
+      return res.status(400).json({ error: 'Judul dan isi pengumuman harus diisi' });
+    }
+    
+    if (!db) {
+      console.log('❌ [PENGUMUMAN PUBLIC POST] Database not available, returning mock data');
+      const mockPengumuman = {
+        id: Date.now(),
+        judul,
+        isi,
+        gambar_url: null,
+        created_at: new Date().toISOString()
+      };
+      return res.status(201).json(mockPengumuman);
+    }
+    
+    const query = 'INSERT INTO pengumuman (judul, isi, gambar_url) VALUES (?, ?, ?)';
+    const values = [judul, isi, null];
+    
+    console.log('💾 [PENGUMUMAN PUBLIC POST] Executing query:', query);
+    console.log('💾 [PENGUMUMAN PUBLIC POST] Values:', values);
+    
+    db.query(query, values, (err, result) => {
+      if (err) {
+        console.error('❌ [PENGUMUMAN PUBLIC POST] Database error:', err);
+        return res.status(500).json({ error: 'Database error occurred' });
+      }
+      
+      const newPengumuman = {
+        id: result.insertId,
+        judul,
+        isi,
+        gambar_url: null,
+        created_at: new Date().toISOString()
+      };
+      
+      console.log('✅ [PENGUMUMAN PUBLIC POST] Created successfully:', newPengumuman);
+      res.status(201).json(newPengumuman);
+    });
+    
+  } catch (error) {
+    console.error('❌ [PENGUMUMAN PUBLIC POST] Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
+
+
+// ==============================================
+// USER-SPECIFIC ENDPOINTS
+// ==============================================
+
+// User specific permintaan jadwal
+app.get('/api/permintaan-jadwal/user/:userId', simpleAuth, (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    console.log('🔍 [USER PERMINTAAN] User ID:', userId);
+    console.log('🔍 [USER PERMINTAAN] Auth user:', req.user);
+
+    // Check authorization
+    if (req.user.role === 'user' && req.user.id !== parseInt(userId)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
     if (!db) {
       return res.json([]);
     }
     
-    db.query('SELECT id, nama, email, role FROM users UNION SELECT id, nama, email, "mentor" as role FROM mentors', (err, results) => {
+    db.query('SELECT * FROM permintaan_jadwal WHERE user_id = ? ORDER BY created_at DESC', [userId], (err, results) => {
       if (err) {
-        return res.json([]);
+        console.error('❌ [USER PERMINTAAN] Database error:', err);
+        return res.status(500).json({ error: 'Database error occurred' });
       }
+      
+      console.log('✅ [USER PERMINTAAN] Fetched', results.length, 'permintaan for user', userId);
       res.json(results);
     });
+    
   } catch (error) {
+    console.error('❌ [USER PERMINTAAN] Error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// ==============================================
-// CHAT ENDPOINTS
-// ==============================================
-
-// Find or create conversation (for users/mentors to initiate with admin)
-app.post('/api/chat/conversations/findOrCreate', simpleAuth, (req, res) => {
-  console.log('\n💬 ====== FIND OR CREATE CONVERSATION ======');
-  console.log('📦 Request data:', req.body);
-  console.log('🔍 Auth user:', req.user);
-  
-  try {
-    const { id: participantId, role: participantRole } = req.user;
-
-    if (participantRole === 'admin') {
-      return res.status(400).json({ error: "Admins cannot initiate conversations this way." });
-    }
-
-    if (!db) {
-      console.log('❌ Database not available, returning mock conversation');
-      return res.json({
-        id: 1,
-        [`${participantRole}_id`]: participantId,
-        admin_id: 1,
-        created_at: new Date().toISOString(),
-        method: 'fallback'
-      });
-    }
-
-    const participantColumn = `${participantRole}_id`;
-
-    // Find the first admin to assign the conversation to
-    db.query('SELECT id FROM admin ORDER BY id LIMIT 1', (err, admins) => {
-      if (err) {
-        console.error('❌ Error finding admin:', err);
-        return res.status(500).json({ error: err.message || 'Database error occurred' });
-      }
-      
-      if (admins.length === 0) {
-        console.log('❌ No admins available');
-        return res.status(500).json({ error: "No admins available to start a conversation." });
-      }
-      
-      const adminId = admins[0].id;
-      console.log('✅ Found admin ID:', adminId);
-
-      // Check if participant exists in database
-      const participantTable = participantRole === 'mentor' ? 'mentors' : 'users';
-      const checkParticipantQuery = `SELECT id FROM ${participantTable} WHERE id = ?`;
-      
-      db.query(checkParticipantQuery, [participantId], (err, participantResult) => {
-        if (err) {
-          console.error('❌ Error checking participant:', err);
-          return res.status(500).json({ error: err.message || 'Database error occurred' });
-        }
-        
-        if (participantResult.length === 0) {
-          console.log(`⚠️ Participant ${participantId} not found in ${participantTable}, using fallback`);
-          // Return mock conversation for non-existent participants
-          return res.json({
-            id: `mock_${participantId}_${Date.now()}`,
-            [participantColumn]: participantId,
-            admin_id: adminId,
-            created_at: new Date().toISOString(),
-            method: 'fallback_mock'
-          });
-        }
-
-        // Participant exists, proceed with normal flow
-        const findQuery = `SELECT * FROM conversations WHERE ${participantColumn} = ? AND admin_id = ?`;
-        db.query(findQuery, [participantId, adminId], (err, results) => {
-          if (err) {
-            console.error('❌ Error finding conversation:', err);
-            return res.status(500).json({ error: err.message || 'Database error occurred' });
-          }
-
-          if (results.length > 0) {
-            console.log('✅ Conversation already exists:', results[0].id);
-            return res.json(results[0]);
-          } else {
-            console.log('📝 Creating new conversation...');
-            // Create a new conversation
-            const createQuery = `INSERT INTO conversations (${participantColumn}, admin_id) VALUES (?, ?)`;
-            db.query(createQuery, [participantId, adminId], (err, result) => {
-              if (err) {
-                console.error('❌ Error creating conversation:', err);
-                return res.status(500).json({ error: err.message || 'Database error occurred' });
-              }
-              
-              console.log('✅ Conversation created with ID:', result.insertId);
-              res.status(201).json({ 
-                id: result.insertId, 
-                [participantColumn]: participantId, 
-                admin_id: adminId,
-                created_at: new Date().toISOString()
-              });
-            });
-          }
-        });
-      });
-    });
-  } catch (error) {
-    console.error('❌ [FIND OR CREATE CONVERSATION] Error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Admin find or create conversation
-app.post('/api/chat/admin/conversations/findOrCreate', simpleAuth, (req, res) => {
-  console.log('\n💬 ====== ADMIN FIND OR CREATE CONVERSATION ======');
-  console.log('📦 Request data:', req.body);
-  console.log('🔍 Auth user:', req.user);
-  
-  try {
-    const { id: adminId, role: adminRole } = req.user;
-    const { targetId, targetRole } = req.body;
-
-    if (adminRole !== 'admin') {
-      return res.status(403).json({ error: "Only admins can use this endpoint." });
-    }
-
-    if (!targetId || !targetRole || !['user', 'mentor'].includes(targetRole)) {
-      return res.status(400).json({ error: "targetId and targetRole ('user' or 'mentor') are required." });
-    }
-
-    if (!db) {
-      console.log('❌ Database not available, returning mock conversation');
-      return res.json({
-        id: 1,
-        [`${targetRole}_id`]: targetId,
-        admin_id: adminId,
-        created_at: new Date().toISOString(),
-        method: 'fallback'
-      });
-    }
-
-    const participantColumn = `${targetRole}_id`;
-
-    const findQuery = `SELECT * FROM conversations WHERE ${participantColumn} = ? AND admin_id = ?`;
-    db.query(findQuery, [targetId, adminId], (err, results) => {
-      if (err) {
-        console.error('❌ Error finding conversation:', err);
-        return res.status(500).json({ error: err.message || 'Database error occurred' });
-      }
-
-      if (results.length > 0) {
-        console.log('✅ Conversation already exists:', results[0].id);
-        return res.json(results[0]);
-      } else {
-        console.log('📝 Creating new conversation...');
-        const createQuery = `INSERT INTO conversations (${participantColumn}, admin_id) VALUES (?, ?)`;
-        db.query(createQuery, [targetId, adminId], (err, result) => {
-          if (err) {
-            console.error('❌ Error creating conversation:', err);
-            return res.status(500).json({ error: err.message || 'Database error occurred' });
-          }
-          
-          console.log('✅ Conversation created with ID:', result.insertId);
-          res.status(201).json({ 
-            id: result.insertId, 
-            [participantColumn]: targetId, 
-            admin_id: adminId,
-            created_at: new Date().toISOString()
-          });
-        });
-      }
-    });
-  } catch (error) {
-    console.error('❌ [ADMIN FIND OR CREATE CONVERSATION] Error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Send message
-app.post('/api/chat/messages/send', simpleAuth, (req, res) => {
+// User specific jadwal sesi
+app.get('/api/jadwal-sesi/user/:userId', simpleAuth, (req, res) => {
   console.log('\n💬 ====== SEND MESSAGE ======');
   console.log('📦 Request data:', req.body);
   console.log('🔍 Auth user:', req.user);
@@ -1209,6 +1519,199 @@ app.get('/api/history-materi', simpleAuth, (req, res) => {
       res.json(results);
     });
   } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST History Materi endpoint - Create new learning report
+app.post('/api/history-materi', simpleAuth, (req, res) => {
+  try {
+    console.log('\n📚 ====== CREATE HISTORY MATERI ======');
+    console.log('📦 Request data:', req.body);
+    console.log('👤 Auth user:', req.user);
+    
+    const { 
+      jadwal_sesi_id, 
+      silabus_id, 
+      hasil_belajar, 
+      materi_diajarkan,
+      user_id,
+      kelas_id,
+      mentor_id,
+      mata_pelajaran_id,
+      minggu_ke,
+      tanggal
+    } = req.body;
+    
+    // Validate required fields
+    if (!jadwal_sesi_id || !hasil_belajar || !materi_diajarkan) {
+      console.log('❌ Validation failed - missing required fields');
+      return res.status(400).json({ 
+        error: 'jadwal_sesi_id, hasil_belajar, dan materi_diajarkan wajib diisi' 
+      });
+    }
+    
+    // Validate silabus_id if provided
+    if (silabus_id) {
+      console.log('🔍 Validating silabus_id:', silabus_id);
+      // Check if silabus exists
+      db.query('SELECT id FROM silabus WHERE id = ?', [silabus_id], (err, results) => {
+        if (err) {
+          console.error('❌ Error validating silabus:', err);
+          return res.status(500).json({ error: 'Database error validating silabus' });
+        }
+        
+        if (results.length === 0) {
+          console.log('❌ Silabus not found:', silabus_id);
+          return res.status(400).json({ error: 'Silabus tidak ditemukan' });
+        }
+        
+        console.log('✅ Silabus validated successfully');
+        insertHistoryMateri();
+      });
+    } else {
+      console.log('⚠️ No silabus_id provided - proceeding without validation');
+      insertHistoryMateri();
+    }
+    
+    function insertHistoryMateri() {
+      // Get additional data from jadwal_sesi if not provided
+      if (!user_id || !kelas_id || !mentor_id || !mata_pelajaran_id || !tanggal) {
+        console.log('🔍 Fetching additional data from jadwal_sesi...');
+        db.query(`
+          SELECT js.kelas_id, js.mentor_id, js.mata_pelajaran_id, js.tanggal, js.sesi,
+                 k.nama as nama_kelas, m.nama as nama_mentor, mp.nama as nama_mapel
+          FROM jadwal_sesi js
+          LEFT JOIN kelas k ON js.kelas_id = k.id
+          LEFT JOIN mentors m ON js.mentor_id = m.id
+          LEFT JOIN mata_pelajaran mp ON js.mata_pelajaran_id = mp.id
+          WHERE js.id = ?
+        `, [jadwal_sesi_id], (err, results) => {
+          if (err) {
+            console.error('❌ Error fetching jadwal_sesi data:', err);
+            return res.status(500).json({ error: 'Database error fetching jadwal data' });
+          }
+          
+          if (results.length === 0) {
+            console.log('❌ Jadwal sesi not found:', jadwal_sesi_id);
+            return res.status(400).json({ error: 'Jadwal sesi tidak ditemukan' });
+          }
+          
+          const jadwalData = results[0];
+          console.log('✅ Jadwal data fetched:', jadwalData);
+          
+          // Insert history materi with fetched data
+          const insertQuery = `
+            INSERT INTO history_materi (
+              jadwal_sesi_id, silabus_id, user_id, kelas_id, mentor_id, 
+              mata_pelajaran_id, minggu_ke, tanggal, hasil_belajar, materi_diajarkan
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `;
+          
+          const insertValues = [
+            jadwal_sesi_id,
+            silabus_id || null,
+            user_id || null, // Will be filled from jadwal_sesi if needed
+            jadwalData.kelas_id,
+            jadwalData.mentor_id,
+            jadwalData.mata_pelajaran_id,
+            minggu_ke || null,
+            jadwalData.tanggal,
+            hasil_belajar,
+            materi_diajarkan
+          ];
+          
+          console.log('🔍 Inserting history materi with query:', insertQuery);
+          console.log('📝 Insert values:', insertValues);
+          
+          db.query(insertQuery, insertValues, (err, result) => {
+            if (err) {
+              console.error('❌ Error inserting history materi:', err);
+              return res.status(500).json({ 
+                error: 'Database error inserting history materi',
+                details: err.message 
+              });
+            }
+            
+            console.log('✅ History materi created successfully, ID:', result.insertId);
+            
+            // Update jadwal_sesi status to completed
+            db.query('UPDATE jadwal_sesi SET status = ? WHERE id = ?', ['completed', jadwal_sesi_id], (err) => {
+              if (err) {
+                console.error('⚠️ Error updating jadwal_sesi status:', err);
+                // Don't fail the request, just log the error
+              } else {
+                console.log('✅ Jadwal sesi status updated to completed');
+              }
+            });
+            
+            res.json({
+              message: 'Laporan belajar berhasil disimpan',
+              id: result.insertId,
+              jadwal_sesi_id,
+              silabus_id,
+              status: 'completed'
+            });
+          });
+        });
+      } else {
+        // All data provided, insert directly
+        const insertQuery = `
+          INSERT INTO history_materi (
+            jadwal_sesi_id, silabus_id, user_id, kelas_id, mentor_id, 
+            mata_pelajaran_id, minggu_ke, tanggal, hasil_belajar, materi_diajarkan
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+        
+        const insertValues = [
+          jadwal_sesi_id,
+          silabus_id || null,
+          user_id,
+          kelas_id,
+          mentor_id,
+          mata_pelajaran_id,
+          minggu_ke || null,
+          tanggal,
+          hasil_belajar,
+          materi_diajarkan
+        ];
+        
+        console.log('🔍 Inserting history materi with provided data');
+        console.log('📝 Insert values:', insertValues);
+        
+        db.query(insertQuery, insertValues, (err, result) => {
+          if (err) {
+            console.error('❌ Error inserting history materi:', err);
+            return res.status(500).json({ 
+              error: 'Database error inserting history materi',
+              details: err.message 
+            });
+          }
+          
+          console.log('✅ History materi created successfully, ID:', result.insertId);
+          
+          // Update jadwal_sesi status to completed
+          db.query('UPDATE jadwal_sesi SET status = ? WHERE id = ?', ['completed', jadwal_sesi_id], (err) => {
+            if (err) {
+              console.error('⚠️ Error updating jadwal_sesi status:', err);
+            } else {
+              console.log('✅ Jadwal sesi status updated to completed');
+            }
+          });
+          
+          res.json({
+            message: 'Laporan belajar berhasil disimpan',
+            id: result.insertId,
+            jadwal_sesi_id,
+            silabus_id,
+            status: 'completed'
+          });
+        });
+      }
+    }
+    
+  } catch (error) {
+    console.error('❌ Error in POST /api/history-materi:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1455,6 +1958,14 @@ app.get('/api/mentors/:mentorId/jadwal', simpleAuth, (req, res) => {
   }
 });
 
+// Test endpoint untuk debug
+app.get('/api/test-mentor/:mentorId', (req, res) => {
+  console.log('🧪 [TEST] Mentor endpoint hit');
+  console.log('🧪 [TEST] Mentor ID:', req.params.mentorId);
+  console.log('🧪 [TEST] Headers:', req.headers);
+  res.json({ message: 'Test endpoint working', mentorId: req.params.mentorId });
+});
+
 // Mentor history materi endpoint
 app.get('/api/history-materi/mentor/:mentorId', simpleAuth, (req, res) => {
   try {
@@ -1462,6 +1973,7 @@ app.get('/api/history-materi/mentor/:mentorId', simpleAuth, (req, res) => {
     
     console.log('🔍 [MENTOR HISTORY] Mentor ID:', mentorId);
     console.log('🔍 [MENTOR HISTORY] Auth user:', req.user);
+    console.log('🔍 [MENTOR HISTORY] Headers:', req.headers);
     
     // Check authorization
     if (req.user.role === 'mentor' && req.user.id !== parseInt(mentorId)) {
@@ -1891,6 +2403,73 @@ app.get('/api/mentors/:id/profile-picture', simpleAuth, (req, res) => {
   } catch (error) {
     console.error('❌ [GET PROFILE PICTURE] Error:', error);
     res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
+// GET /api/mentors/available - Get available mentors for specific criteria
+app.get('/api/mentors/available', simpleAuth, (req, res) => {
+  const { mapel_id, tanggal, sesi, kelas_id } = req.query;
+  
+  // Validate required parameters
+  if (!mapel_id || !tanggal || !sesi) {
+    return res.status(400).json({ 
+      error: 'Parameter mapel_id, tanggal, dan sesi wajib diisi' 
+    });
+  }
+  
+  try {
+    // Get day of week from date
+    const date = new Date(tanggal);
+    const hari = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][date.getDay()];
+    
+    // Calculate week number (same as working system)
+    const startOfYear = new Date(date.getFullYear(), 0, 1);
+    const days = Math.floor((date - startOfYear) / (24 * 60 * 60 * 1000));
+    const mingguKe = Math.ceil((days + startOfYear.getDay() + 1) / 7);
+    
+    console.log('\n🔍 ====== MENTOR AVAILABILITY CHECK ======');
+    console.log(`- Kriteria: Hari=${hari}, Sesi=${sesi}, MingguKe=${mingguKe}, MapelID=${mapel_id}`);
+    
+    // Query with mentor status filter - only active mentors
+    const sql = `
+      SELECT DISTINCT m.id, m.nama, m.email
+      FROM mentors m
+      INNER JOIN mentor_mata_pelajaran mmp ON m.id = mmp.mentor_id
+      INNER JOIN availability_mentor am ON m.id = am.mentor_id 
+        AND am.hari = ? 
+        AND am.sesi = ? 
+        AND am.minggu_ke = ?
+        AND am.is_available = 1
+      WHERE 
+        mmp.mata_pelajaran_id = ? 
+        AND m.status = 'active'
+        AND NOT EXISTS (
+          SELECT 1 FROM jadwal_sesi js
+          WHERE js.mentor_id = m.id 
+            AND js.tanggal = ? 
+            AND js.sesi = ?
+            AND js.status IN ('scheduled', 'approved', 'completed')
+        )
+      ORDER BY m.nama
+    `;
+    
+    const params = [hari, sesi, mingguKe, mapel_id, tanggal, sesi];
+    
+    db.query(sql, params, (err, results) => {
+      if (err) {
+        console.error('❌ Error fetching available mentors:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+      
+      console.log(`- Mentor Ditemukan: ${results.length}`);
+      console.log('✅ ====== CHECK COMPLETE ======');
+      
+      res.json(results);
+    });
+    
+  } catch (error) {
+    console.error('Error in get available mentors:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -2522,6 +3101,7 @@ app.use('/api/*', (req, res) => {
       'GET /api/history-materi/user/:userId',
       'GET /api/users/:userId',
       'GET /api/mentors/:mentorId/jadwal',
+      'GET /api/mentors/available',
       'GET /api/history-materi/mentor/:mentorId',
       'GET /api/availability-mentor',
       'POST /api/availability-mentor',
